@@ -186,7 +186,7 @@ export const useAudioManager = () => {
             throw new Error(`Failed to fetch audio file: ${response.status}`);
           }
           const arrayBuffer = await response.arrayBuffer();
-          const audioBuffer = await context.decodeAudioData(arrayBuffer);
+          let audioBuffer = await context.decodeAudioData(arrayBuffer);
           
           // Apply advanced noise reduction to voice files
           const channels = [];
