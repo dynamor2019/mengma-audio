@@ -53,7 +53,7 @@ const Index = () => {
               <AudioWaveform className="w-8 h-8 text-primary-foreground" />
             </div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-              音频合成工作站
+              音频合成工作台
             </h1>
           </div>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">

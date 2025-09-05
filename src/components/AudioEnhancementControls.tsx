@@ -1,7 +1,7 @@
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/Utils';
 
 interface AudioEnhancementControlsProps {
   gain: number;
@@ -103,7 +103,7 @@ export const AudioEnhancementControls = ({
         <div className="flex gap-2 text-xs">
           {gain > 150 && (
             <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded">
-              高增益
+              高增�?
             </span>
           )}
           {gain > 250 && (

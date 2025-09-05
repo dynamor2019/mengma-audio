@@ -6,7 +6,7 @@ import { VolumeControl } from '@/components/VolumeControl';
 import { LoudnessIndicator } from '@/components/LoudnessIndicator';
 import { AudioEnhancementControls } from '@/components/AudioEnhancementControls';
 import { WaveformVisualization } from '@/components/WaveformVisualization';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/Utils';
 
 export interface AudioFile {
   id: string;
@@ -92,7 +92,7 @@ export const AudioTrack = ({
                 className="hover:bg-secondary"
               >
                 <Volume2 className="w-4 h-4 mr-2" />
-                {isNormalizingVolume ? '标准化中...' : '音量一致'}
+                {isNormalizingVolume ? '标准化中...' : '音量一键标准化'}
               </Button>
             )}
             <Button

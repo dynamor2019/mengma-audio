@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/Utils';
 import { ExportFormatSelector, type AudioFormat } from '@/components/ExportFormatSelector';
 
 interface ComposedAudioPlayerProps {
@@ -109,7 +109,7 @@ export const ComposedAudioPlayer = ({
           </Badge>
           {isComposing && (
             <Badge variant="secondary" className="bg-primary/20 text-primary animate-pulse">
-              合成中...
+              合成中..
             </Badge>
           )}
         </div>

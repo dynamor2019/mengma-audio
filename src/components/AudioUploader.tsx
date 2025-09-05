@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { Upload, Music, Mic } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/Utils';
 
 interface AudioUploaderProps {
   onFilesUpload: (files: File[], type: 'voice' | 'music') => void;
