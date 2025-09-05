@@ -11,7 +11,10 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "cap:sync": "npx --package=@capacitor/cli@^7.4.3 cap sync",
+    "cap:sync:android": "npx --package=@capacitor/cli@^7.4.3 cap sync android",
+    "cap:build:android": "npm run build && npm run cap:sync:android"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",
