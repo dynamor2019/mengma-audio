@@ -56,7 +56,7 @@ export const AudioTrack = ({
   const trackColor = type === 'voice' ? 'track-voice' : 'track-music';
   const trackBgColor = type === 'voice' ? 'track-voice-bg' : 'track-music-bg';
   
-  const totalDuration = useMemo(() => {
+  const trackTotalDuration = useMemo(() => {
     return files.reduce((total, file) => total + file.duration, 0);
   }, [files]);
 
@@ -69,7 +69,7 @@ export const AudioTrack = ({
   return (
     <Card className="bg-gradient-secondary border-border overflow-hidden">
       <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className={cn(
               "w-3 h-3 rounded-full",
@@ -79,20 +79,20 @@ export const AudioTrack = ({
               {type === 'voice' ? '语音轨道' : '背景音乐'}
             </h3>
             <span className="text-sm text-muted-foreground">
-              {files.length} 个文件 · {formatDuration(totalDuration)}
+              {files.length} 个文件 · {formatDuration(trackTotalDuration)}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 justify-end">
             {type === 'voice' && onNormalizeVolume && files.length > 1 && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={onNormalizeVolume}
                 disabled={isNormalizingVolume}
-                className="hover:bg-secondary"
+                className="hover:bg-secondary text-xs px-2 py-1"
               >
-                <Volume2 className="w-4 h-4 mr-2" />
-                {isNormalizingVolume ? '标准化中...' : '音量一键标准化'}
+                <Volume2 className="w-3 h-3 mr-1" />
+                {isNormalizingVolume ? '标准化中...' : '音量标准化'}
               </Button>
             )}
             <Button
@@ -108,11 +108,11 @@ export const AudioTrack = ({
                 <Play className="w-4 h-4" />
               )}
             </Button>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-3">
               <LoudnessIndicator
                 isPlaying={isPlaying}
                 trackType={type}
-                className="min-w-[120px]"
+                className="min-w-[80px] sm:min-w-[120px]"
               />
               <VolumeControl
                 volume={volume}

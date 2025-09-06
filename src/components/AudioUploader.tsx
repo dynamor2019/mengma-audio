@@ -10,15 +10,27 @@ interface AudioUploaderProps {
 }
 
 export const AudioUploader = ({ onFilesUpload, accept = ".mp3,.wav,.m4a,.flac", multiple = true }: AudioUploaderProps) => {
-  const handleFileChange = useCallback((files: FileList | null, type: 'voice' | 'music') => {
-    if (files) {
-      const audioFiles = Array.from(files).filter(file => 
-        file.type.startsWith('audio/') || 
-        ['.mp3', '.wav', '.m4a', '.flac'].some(ext => file.name.toLowerCase().endsWith(ext))
-      );
+  const handleFileChange = useCallback((fileList: FileList | null, type: 'voice' | 'music') => {
+    console.log('AudioUploader: handleFileChange triggered', { fileList, type });
+    if (fileList) {
+      const files = Array.from(fileList);
+      console.log('AudioUploader: 选择的文件:', files.map(f => ({ name: f.name, type: f.type, size: f.size })));
+      const audioFiles = files.filter(file => {
+        const isAudio = file.type.startsWith('audio/') || 
+                       /\.(mp3|wav|m4a|flac|aac|ogg)$/i.test(file.name);
+        console.log(`AudioUploader: 文件 ${file.name} 是否为音频:`, isAudio);
+        return isAudio;
+      });
+      
+      console.log('AudioUploader: 过滤后的音频文件:', audioFiles.map(f => f.name));
       if (audioFiles.length > 0) {
+        console.log('AudioUploader: 调用 onFilesUpload', { audioFiles: audioFiles.map(f => f.name), type });
         onFilesUpload(audioFiles, type);
+      } else {
+        console.warn('AudioUploader: 没有有效的音频文件');
       }
+    } else {
+      console.log('AudioUploader: fileList 为空');
     }
   }, [onFilesUpload]);
 
@@ -40,42 +52,44 @@ export const AudioUploader = ({ onFilesUpload, accept = ".mp3,.wav,.m4a,.flac", 
         onChange={(e) => handleFileChange(e.target.files, type)}
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
       />
-      <div className="p-8 text-center">
+      <div className="p-3 flex items-center gap-3">
         <div className={cn(
-          "w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center transition-all duration-300",
+          "w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center transition-all duration-300",
           type === 'voice' 
             ? "bg-track-voice-bg group-hover:bg-track-voice/20" 
             : "bg-track-music-bg group-hover:bg-track-music/20"
         )}>
           <Icon className={cn(
-            "w-8 h-8 transition-colors duration-300",
+            "w-5 h-5 transition-colors duration-300",
             type === 'voice' 
               ? "text-track-voice" 
               : "text-track-music"
           )} />
         </div>
-        <h3 className="text-lg font-semibold mb-2 text-foreground">{title}</h3>
-        <p className="text-muted-foreground mb-4">{description}</p>
-        <div className="text-sm text-muted-foreground">
-          支持格式: MP3, WAV, M4A, FLAC
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold mb-1 text-foreground truncate">{title}</h3>
+          <p className="text-xs text-muted-foreground mb-1 truncate">{description}</p>
+          <div className="text-xs text-muted-foreground opacity-75">
+            MP3, WAV, M4A, FLAC
+          </div>
         </div>
       </div>
     </Card>
   );
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4">
       <UploadZone
         type="voice"
         icon={Mic}
         title="语音轨道"
-        description="上传您的语音文件，将在主轨道中播放"
+        description="上传语音文件"
       />
       <UploadZone
         type="music"
         icon={Music}
         title="背景音乐"
-        description="上传背景音乐文件，将在背景轨道中播放"
+        description="上传背景音乐"
       />
     </div>
   );
