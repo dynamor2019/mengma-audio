@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, memo } from 'react';
 import { Upload, Music, Mic } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/Utils';
@@ -9,7 +9,7 @@ interface AudioUploaderProps {
   multiple?: boolean;
 }
 
-export const AudioUploader = ({ onFilesUpload, accept = ".mp3,.wav,.m4a,.flac", multiple = true }: AudioUploaderProps) => {
+const AudioUploaderComponent = ({ onFilesUpload, accept = ".mp3,.wav,.m4a,.flac", multiple = true }: AudioUploaderProps) => {
   const handleFileChange = useCallback((fileList: FileList | null, type: 'voice' | 'music') => {
     console.log('AudioUploader: handleFileChange triggered', { fileList, type });
     if (fileList) {
@@ -54,22 +54,22 @@ export const AudioUploader = ({ onFilesUpload, accept = ".mp3,.wav,.m4a,.flac", 
       />
       <div className="p-3 flex items-center gap-3">
         <div className={cn(
-          "w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center transition-all duration-300",
+          "w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center transition-all duration-300",
           type === 'voice' 
             ? "bg-track-voice-bg group-hover:bg-track-voice/20" 
             : "bg-track-music-bg group-hover:bg-track-music/20"
         )}>
           <Icon className={cn(
-            "w-5 h-5 transition-colors duration-300",
+            "w-4 h-4 transition-colors duration-300",
             type === 'voice' 
               ? "text-track-voice" 
               : "text-track-music"
           )} />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold mb-1 text-foreground truncate">{title}</h3>
-          <p className="text-xs text-muted-foreground mb-1 truncate">{description}</p>
-          <div className="text-xs text-muted-foreground opacity-75">
+          <h3 className="text-xs font-medium mb-0.5 text-foreground truncate">{title}</h3>
+          <p className="text-[11px] text-muted-foreground mb-0.5 truncate">{description}</p>
+          <div className="text-[11px] text-muted-foreground opacity-75">
             MP3, WAV, M4A, FLAC
           </div>
         </div>
@@ -94,3 +94,5 @@ export const AudioUploader = ({ onFilesUpload, accept = ".mp3,.wav,.m4a,.flac", 
     </div>
   );
 };
+
+export const AudioUploader = memo(AudioUploaderComponent);

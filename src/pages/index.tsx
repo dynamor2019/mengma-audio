@@ -1,18 +1,20 @@
-import { AudioUploader } from '@/components/AudioUploader';
 import { AudioTrack } from '@/components/AudioTrack';
 import { ComposedAudioPlayer } from '@/components/ComposedAudioPlayer';
 import { AudioRecoveryDemo } from '@/components/AudioRecoveryDemo';
 import { useAudioManager } from '@/hooks/useAudioManager';
-import { Headphones, AudioWaveform, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import MobileLayout from '@/layouts/MobileLayout';
+import { useLocation } from 'react-router-dom';
 
 
 const Index = () => {
+  const location = useLocation();
+  const isClassic = new URLSearchParams(location.search).has('classic');
   const {
     voiceFiles,
     musicFiles,
     isPlaying,
-    currentTime,
     voiceVolume,
     musicVolume,
     voiceMuted,
@@ -22,13 +24,11 @@ const Index = () => {
     voiceGain,
     musicGain,
     voicePitch,
-    totalDuration,
     handleFilesUpload,
     removeFile,
     reorderFiles,
     playAudio,
-    stopAudio,
-    resetAll,
+    pauseAudio,
     composeAudio,
     downloadComposedAudio,
     setVoiceVolume,
@@ -38,41 +38,17 @@ const Index = () => {
     setVoiceGain,
     setMusicGain,
     setVoicePitch,
-    setCurrentTime,
-    normalizeVoiceVolumes,
+    normalizeVolume,
     isNormalizingVolume
   } = useAudioManager();
 
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-3 py-4 lg:px-4 lg:py-6">
-        {/* Header */}
-        <header className="text-center mb-4">
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <div className="p-2 bg-gradient-primary rounded-full shadow-glow">
-              <AudioWaveform className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-              音频合成工作站
-            </h1>
-          </div>
-          <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
-            专业的双轨道音频编辑平台，轻松合成语音与背景音乐
-          </p>
-        </header>
+  const content = (
+    <>
 
-        {/* Upload Section */}
-        <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Headphones className="w-4 h-4 text-primary" />
-            音频文件上传
-          </h2>
-          <AudioUploader onFilesUpload={handleFilesUpload} />
-        </section>
+        {/* 已移除顶部上传区，改为在各轨道内提供本地上传 */}
 
         {/* Audio Tracks */}
-        <section className="mb-4 space-y-3">
-          <h2 className="text-lg font-semibold">音频轨道</h2>
+        <section className="mb-2 space-y-2">
           
           <AudioTrack
             type="voice"
@@ -89,8 +65,10 @@ const Index = () => {
             onGainChange={setVoiceGain}
             pitch={voicePitch}
             onPitchChange={setVoicePitch}
-            onNormalizeVolume={normalizeVoiceVolumes}
+            onNormalizeVolume={normalizeVolume}
             isNormalizingVolume={isNormalizingVolume}
+            onAddVoiceFiles={(files) => handleFilesUpload(files, 'voice')}
+            onAddFiles={(files) => handleFilesUpload(files, 'voice')}
           />
           
           <AudioTrack
@@ -106,41 +84,48 @@ const Index = () => {
             onMuteToggle={() => setMusicMuted(!musicMuted)}
             gain={musicGain}
             onGainChange={setMusicGain}
+            onAddFiles={(files) => handleFilesUpload(files, 'music')}
           />
         </section>
 
         
         {/* Compose Button */}
-        <section className="mb-4">
-          <div className="text-center">
+        <section className="mb-2">
+          <div className="flex items-center justify-center py-2">
             <Button
               onClick={composeAudio}
               disabled={isComposing || (voiceFiles.length === 0 && musicFiles.length === 0)}
-              className="bg-gradient-accent hover:bg-gradient-accent/90 text-accent-foreground shadow-accent px-4 py-2"
+              className="relative bg-gradient-accent hover:bg-gradient-accent/90 text-black dark:text-white shadow-accent px-4 py-2 font-semibold disabled:!opacity-100 disabled:cursor-not-allowed dark:bg-none dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:shadow-none"
             >
-              <Sparkles className="w-4 h-4 mr-2" />
-              {isComposing ? '合成中...' : '合成音频'}
+              <Sparkles className="w-4 h-4 mr-2 pointer-events-none relative z-10" />
+              <span className="pointer-events-none relative z-10">
+                {isComposing ? '合成中...' : '合成音频'}
+              </span>
             </Button>
           </div>
         </section>
 
         {/* Composed Audio Player */}
-        <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-3">合成音频播放</h2>
+        <section className="mb-2">
           <ComposedAudioPlayer
             composedAudioUrl={composedAudioUrl}
             onDownload={downloadComposedAudio}
             isComposing={isComposing}
+            onStartPlay={pauseAudio}
           />
         </section>
 
         {/* Audio Recovery Demo */}
-        <section className="mb-4">
+        <section className="mb-2">
           <AudioRecoveryDemo />
         </section>
+    </>
+  );
 
-      </div>
-    </div>
+  return isClassic ? (
+    content
+  ) : (
+    <MobileLayout title="猛犸音频合成">{content}</MobileLayout>
   );
 };
 

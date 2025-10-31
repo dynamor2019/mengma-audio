@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
@@ -8,8 +8,9 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 220 13% 9%;
-    --foreground: 220 9% 95%;
+    /* Brand palette extracted from splash icon (HSL) */
+    --background: 15 0% 10%;
+    --foreground: 15 19% 95%;
 
     --card: 224 15% 12%;
     --card-foreground: 220 9% 95%;
@@ -17,39 +18,39 @@ All colors MUST be HSL.
     --popover: 224 15% 12%;
     --popover-foreground: 220 9% 95%;
 
-    --primary: 265 89% 65%;
-    --primary-foreground: 220 13% 9%;
+    --primary: 15 19% 65%;
+    --primary-foreground: 15 0% 10%;
     
-    --primary-glow: 265 70% 75%;
-    --primary-dark: 265 89% 55%;
+    --primary-glow: 15 9% 75%;
+    --primary-dark: 15 19% 55%;
 
-    --secondary: 224 15% 16%;
-    --secondary-foreground: 220 9% 95%;
+    --secondary: 15 0% 25%;
+    --secondary-foreground: 15 19% 95%;
 
-    --muted: 224 15% 16%;
-    --muted-foreground: 220 9% 65%;
+    --muted: 15 0% 22%;
+    --muted-foreground: 15 19% 80%;
 
-    --accent: 45 93% 58%;
-    --accent-foreground: 220 13% 9%;
-    --accent-glow: 45 93% 68%;
+    --accent: 45 19% 75%;
+    --accent-foreground: 15 0% 10%;
+    --accent-glow: 45 19% 85%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 220 9% 95%;
+    --destructive-foreground: 15 19% 95%;
 
-    --border: 224 15% 20%;
-    --input: 224 15% 16%;
-    --ring: 265 89% 65%;
+    --border: 15 3% 28%;
+    --input: 15 0% 22%;
+    --ring: 15 19% 65%;
 
     --track-voice: 199 89% 48%;
     --track-music: 340 82% 52%;
     --track-voice-bg: 199 89% 48% / 0.1;
     --track-music-bg: 340 82% 52% / 0.1;
     
-    --gradient-primary: linear-gradient(135deg, hsl(265 89% 65%), hsl(265 70% 75%));
-    --gradient-secondary: linear-gradient(135deg, hsl(224 15% 12%), hsl(224 15% 16%));
-    --gradient-accent: linear-gradient(135deg, hsl(45 93% 58%), hsl(45 93% 68%));
+    --gradient-primary: linear-gradient(135deg, hsl(15 19% 65%), hsl(15 9% 75%));
+    --gradient-secondary: linear-gradient(135deg, hsl(15 0% 18%), hsl(15 0% 25%));
+    --gradient-accent: linear-gradient(135deg, hsl(45 19% 75%), hsl(45 19% 85%));
     
-    --shadow-glow: 0 0 40px hsl(265 89% 65% / 0.3);
+    --shadow-glow: 0 0 40px hsl(15 19% 65% / 0.3);
     --shadow-accent: 0 0 30px hsl(45 93% 58% / 0.2);
     
     --radius: 0.75rem;
@@ -69,6 +70,70 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Ant Design Mobile primary color bridge to our design tokens */
+    --adm-color-primary: hsl(var(--primary));
+  }
+
+  /* 明亮主题（白天模式） */
+  .light {
+    --background: 0 0% 100%; /* 白色背景，更干净明亮 */
+    --foreground: 240 10% 3.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+
+    /* 保持品牌主色，但在亮色下更易读 */
+    --primary: 15 19% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --primary-glow: 15 19% 65%;
+    --primary-dark: 15 19% 45%;
+
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 52%;
+
+    --accent: 45 93% 58%;
+    --accent-foreground: 240 10% 3.9%; /* 恢复原来的accent前景，避免影响其他组件 */
+    --accent-glow: 45 93% 68%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 5.9% 88%;
+    --input: 240 4.8% 95.9%;
+    --ring: 15 19% 62%;
+
+    /* Ant Design inspired color scale with further reduced opacity for subtle integration */
+    --track-voice: 215 91% 59%;  /* Ant Design blue-5 (#1677FF) */
+    --track-music: 340 82% 52%;  /* Ant Design magenta-5 (#EB2F96) */
+    --track-voice-bg: 215 91% 59% / 0.06;
+    --track-music-bg: 340 82% 52% / 0.06;
+
+    --gradient-primary: linear-gradient(135deg, hsl(15 19% 55%), hsl(15 19% 65%));
+    --gradient-secondary: linear-gradient(135deg, hsl(0 0% 100%), hsl(240 4.8% 95.9%));
+    --gradient-accent: linear-gradient(135deg, hsl(45 93% 58%), hsl(45 93% 68%));
+
+    --shadow-glow: 0 0 30px hsl(15 19% 55% / 0.25);
+    --shadow-accent: 0 0 24px hsl(45 93% 58% / 0.2);
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+    --adm-color-primary: hsl(var(--primary));
   }
 
   .dark {
@@ -110,12 +175,108 @@ All colors MUST be HSL.
   }
 }
 
+/* Marquee animation for overflowing inline text */
+@keyframes marquee-horizontal {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.marquee {
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.marquee-content {
+  display: inline-block;
+  min-width: 100%;
+  will-change: transform;
+  animation: marquee-horizontal 8s linear infinite;
+}
+
+.marquee:hover .marquee-content {
+  animation-play-state: paused;
+}
+
+/* 条件性跑马灯动画 - 只在需要时应用 */
+.animate-marquee {
+  animation: marquee-horizontal 8s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-content,
+  .animate-marquee {
+    animation: none;
+    transform: translateX(0);
+  }
+}
+
+/* 强制启用跑马灯（忽略系统减少动态效果设置） */
+[data-force-marquee="true"] .animate-marquee,
+[data-force-marquee="true"] .marquee-content {
+  animation: marquee-horizontal 8s linear infinite !important;
+}
+
 @layer base {
   * {
-    @apply border-border;
+    /* 等效替换 @apply border-border */
+    border-color: hsl(var(--border));
   }
 
   body {
-    @apply bg-background text-foreground;
+    /* 等效替换 @apply bg-background text-foreground */
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  /* Safe area helpers for notch/holes */
+  .safe-area-padding {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Performance hint for animated waveform */
+  .animate-waveform {
+    will-change: transform, opacity;
+  }
+
+  /* Brand image fusion: overlay + filters + border/shadow */
+  .brand-image-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 8px 24px hsla(var(--primary) / 0.25);
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--secondary));
+  }
+
+  .brand-image-wrap::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, hsla(var(--primary) / 0.12), hsla(var(--accent) / 0.08));
+    pointer-events: none;
+  }
+
+  .brand-image {
+    display: block;
+    filter: saturate(1.08) contrast(1.05);
   }
 }

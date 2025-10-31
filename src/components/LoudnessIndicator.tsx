@@ -16,6 +16,7 @@ export const LoudnessIndicator = ({
 }: LoudnessIndicatorProps) => {
   const [loudness, setLoudness] = useState(0);
   const [peakLevel, setPeakLevel] = useState(0);
+  const [rmsDb, setRmsDb] = useState<number>(-60);
   
   const trackColor = trackType === 'voice' ? 'track-voice' : 'track-music';
   
@@ -42,9 +43,10 @@ export const LoudnessIndicator = ({
       const rms = Math.sqrt(sum / (samples.length / 1000));
       const loudnessDb = 20 * Math.log10(rms + 0.001); // Add small value to avoid log(0)
       const normalizedLoudness = Math.max(0, Math.min(100, (loudnessDb + 60) * (100/60))); // Normalize -60dB to 0dB range
-      
+
       setLoudness(normalizedLoudness + Math.random() * 10); // Add some variation for animation
       setPeakLevel(peak * 100);
+      setRmsDb(loudnessDb);
     }, 50);
     
     return () => clearInterval(interval);
@@ -93,9 +95,11 @@ export const LoudnessIndicator = ({
         </div>
       </div>
       
-      {/* Peak level display */}
+      {/* RMS & Peak display */}
       <div className="flex justify-between text-xs text-muted-foreground">
-        <span>RMS</span>
+        <span>
+          RMS: {isPlaying ? `${rmsDb.toFixed(1)} dB` : '--'}
+        </span>
         <span className={cn(
           peakLevel > 90 && "text-red-400 font-bold animate-pulse"
         )}>

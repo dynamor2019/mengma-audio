@@ -29,6 +29,9 @@ export const useAudioManager = () => {
   const animationFrameRef = useRef<number>();
   const activeUrlsRef = useRef<Set<string>>(new Set()); // 跟踪所有活跃的blob URL
   const urlRefCountRef = useRef<Map<string, number>>(new Map()); // URL引用计数
+  // 每轨道主增益节点引用，支持播放中实时调节音量/增益/静音
+  const voiceMasterGainRef = useRef<GainNode | null>(null);
+  const musicMasterGainRef = useRef<GainNode | null>(null);
 
   // 调试函数：记录当前活跃的URL
   const logActiveUrls = useCallback(() => {
@@ -337,21 +340,53 @@ export const useAudioManager = () => {
           };
           
           // 音频元数据加载完成
-          audio.addEventListener('loadedmetadata', () => {
+          audio.addEventListener('loadedmetadata', async () => {
             if (isResolved) return;
-            isResolved = true;
             clearTimeout(timeoutId);
-            
-            const audioFile: AudioFile = {
-              id: Date.now().toString(),
-              name: file.name,
-              url: url,
-              duration: audio.duration || 0,
-              file: file
+
+            const finalize = (finalDuration: number) => {
+              if (isResolved) return;
+              isResolved = true;
+              const audioFile: AudioFile = {
+                id: Date.now().toString(),
+                name: file.name,
+                url: url,
+                duration: finalDuration || 0,
+                file: file
+              };
+              console.log('✅ 音频文件创建成功:', audioFile);
+              resolve(audioFile);
             };
-            
-            console.log('✅ 音频文件创建成功:', audioFile);
-            resolve(audioFile);
+
+            let duration = audio.duration || 0;
+            // 处理部分录音（如 webm）出现 duration 为 0 或 Infinity 的情况
+            if (!isFinite(duration) || duration === 0) {
+              try {
+                const arrayBuffer = await file.arrayBuffer();
+                const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+                if (Ctx) {
+                  const ctx = new Ctx();
+                  const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+                  duration = audioBuffer.duration;
+                  ctx.close?.();
+                }
+              } catch (e) {
+                console.warn('使用 AudioContext 解码时长失败，将尝试 timeupdate 回退', e);
+              }
+            }
+
+            if (!isFinite(duration) || duration === 0) {
+              const onTimeUpdate = () => {
+                if (!isResolved && isFinite(audio.duration) && audio.duration > 0) {
+                  audio.removeEventListener('timeupdate', onTimeUpdate);
+                  finalize(audio.duration);
+                }
+              };
+              audio.addEventListener('timeupdate', onTimeUpdate);
+              try { audio.currentTime = 1e101; } catch {}
+            } else {
+              finalize(duration);
+            }
           });
           
           // 音频可以播放
@@ -470,6 +505,32 @@ export const useAudioManager = () => {
     }
   }, [removeUrlRef]);
 
+  // 重新排序文件（支持语音/音乐轨道）
+  const reorderFiles = useCallback((startIndex: number, endIndex: number, type: 'voice' | 'music') => {
+    try {
+      const move = (list: AudioFile[]) => {
+        if (startIndex === endIndex) return list;
+        if (startIndex < 0 || endIndex < 0 || startIndex >= list.length || endIndex >= list.length) {
+          console.warn('reorderFiles: 索引越界', { startIndex, endIndex, length: list.length });
+          return list;
+        }
+        const next = list.slice();
+        const [moved] = next.splice(startIndex, 1);
+        next.splice(endIndex, 0, moved);
+        return next;
+      };
+
+      if (type === 'voice') {
+        setVoiceFiles(prev => move(prev));
+      } else {
+        setMusicFiles(prev => move(prev));
+      }
+    } catch (error) {
+      console.error('重新排序失败:', error);
+      toast.error('重新排序失败');
+    }
+  }, []);
+
   const clearAllFiles = useCallback(() => {
     // 清理所有文件的URL引用
     [...voiceFiles, ...musicFiles].forEach(file => {
@@ -507,6 +568,12 @@ export const useAudioManager = () => {
     // 清空源数组
     voiceSourcesRef.current = [];
     musicSourcesRef.current = [];
+
+    // 断开并清空主增益节点
+    try { voiceMasterGainRef.current?.disconnect(); } catch {}
+    try { musicMasterGainRef.current?.disconnect(); } catch {}
+    voiceMasterGainRef.current = null;
+    musicMasterGainRef.current = null;
     
     // 取消动画帧
     if (animationFrameRef.current) {
@@ -515,6 +582,7 @@ export const useAudioManager = () => {
     
     setIsPlaying(false);
     setCurrentTime(0);
+    startTimeRef.current = 0;
   }, []);
 
   const playAudio = useCallback(async () => {
@@ -525,6 +593,8 @@ export const useAudioManager = () => {
         toast.error('请先添加音频文件');
         return;
       }
+      // 设置播放起始时间用于进度更新
+      startTimeRef.current = audioContext.currentTime;
       // 1. 语音轨道顺序拼接
       let voiceDuration = 0;
       const voiceBufferList: { buffer: AudioBuffer; gain: number; duration: number }[] = [];
@@ -534,9 +604,10 @@ export const useAudioManager = () => {
           const arrayBuffer = await response.arrayBuffer();
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
           const individualGain = voiceFileGains[file.id] || 100;
+          // 单文件增益仅保留文件级差异，轨道级音量/增益/静音由主增益节点统一控制
           voiceBufferList.push({
             buffer: audioBuffer,
-            gain: (voiceVolume / 100) * (voiceGain / 100) * (individualGain / 100) * (voiceMuted ? 0 : 1),
+            gain: (individualGain / 100),
             duration: audioBuffer.duration
           });
           voiceDuration += audioBuffer.duration;
@@ -544,8 +615,8 @@ export const useAudioManager = () => {
           console.error(`加载语音文件失败: ${file.name}`, error);
         }
       }
-      // 2. 合成总时长 = 语音总时长 + 15s
-      const totalDuration = voiceDuration + 15;
+      // 2. 合成总时长改为语音总时长，音乐循环陪衬语音
+      const totalDuration = voiceDuration;
       // 3. 背景音乐循环
       const musicBufferList: { buffer: AudioBuffer; gain: number }[] = [];
       for (const file of musicFiles) {
@@ -553,9 +624,10 @@ export const useAudioManager = () => {
           const response = await fetch(file.url);
           const arrayBuffer = await response.arrayBuffer();
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          // 音乐文件不区分单文件增益，轨道级由主增益节点统一控制
           musicBufferList.push({
             buffer: audioBuffer,
-            gain: (musicVolume / 100) * (musicGain / 100) * (musicMuted ? 0 : 1)
+            gain: 1
           });
         } catch (error) {
           console.error(`加载音乐文件失败: ${file.name}`, error);
@@ -565,15 +637,30 @@ export const useAudioManager = () => {
         toast.error('没有可播放的音频文件');
         return;
       }
+      // 创建并配置每轨道主增益节点（用于实时联动）
+      const voiceMasterGain = audioContext.createGain();
+      voiceMasterGain.gain.value = (voiceVolume / 100) * (voiceGain / 100) * (voiceMuted ? 0 : 1);
+      voiceMasterGain.connect(audioContext.destination);
+      voiceMasterGainRef.current = voiceMasterGain;
+
+      const musicMasterGain = audioContext.createGain();
+      musicMasterGain.gain.value = (musicVolume / 100) * (musicGain / 100) * (musicMuted ? 0 : 1);
+      musicMasterGain.connect(audioContext.destination);
+      musicMasterGainRef.current = musicMasterGain;
       // 4. 播放语音轨道（顺序拼接）
       let offset = 0;
       voiceBufferList.forEach(({ buffer, gain, duration }) => {
         const source = audioContext.createBufferSource();
         const gainNode = audioContext.createGain();
         source.buffer = buffer;
+        // 实时音调控制：使用 playbackRate 映射 50%~200% 到 0.5~2.0
+        try {
+          source.playbackRate.value = (voicePitch / 100);
+        } catch {}
         gainNode.gain.value = gain;
         source.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        // 接入语音主增益节点
+        gainNode.connect(voiceMasterGainRef.current!);
         source.start(audioContext.currentTime + offset);
         voiceSourcesRef.current.push(source);
         offset += duration;
@@ -588,7 +675,8 @@ export const useAudioManager = () => {
             source.buffer = buffer;
             gainNode.gain.value = gain;
             source.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+            // 接入音乐主增益节点
+            gainNode.connect(musicMasterGainRef.current!);
             const playDuration = Math.min(buffer.duration, totalDuration - musicOffset);
             source.start(audioContext.currentTime + musicOffset);
             // 如果最后一段不足一首，提前 stop
@@ -621,6 +709,38 @@ export const useAudioManager = () => {
       toast.error('播放失败');
     }
   }, [voiceFiles, musicFiles, voiceVolume, musicVolume, voiceGain, musicGain, voiceMuted, musicMuted, voiceFileGains, isPlaying, initAudioContext, stopPlayback]);
+
+  // 播放中实时联动：更新主增益节点的值
+  useEffect(() => {
+    const ctx = audioContextRef.current;
+    const node = voiceMasterGainRef.current;
+    if (!ctx || !node) return;
+    node.gain.value = (voiceVolume / 100) * (voiceGain / 100) * (voiceMuted ? 0 : 1);
+  }, [voiceVolume, voiceGain, voiceMuted]);
+
+  useEffect(() => {
+    const ctx = audioContextRef.current;
+    const node = musicMasterGainRef.current;
+    if (!ctx || !node) return;
+    node.gain.value = (musicVolume / 100) * (musicGain / 100) * (musicMuted ? 0 : 1);
+  }, [musicVolume, musicGain, musicMuted]);
+
+  // 播放中实时联动：更新语音音调（playbackRate）
+  useEffect(() => {
+    const ctx = audioContextRef.current;
+    if (!ctx) return;
+    const rate = Math.max(0.5, Math.min(2.0, voicePitch / 100));
+    try {
+      voiceSourcesRef.current.forEach((src) => {
+        // 更新已在播放或尚未开始的 source 的 playbackRate
+        if (src && src.playbackRate) {
+          src.playbackRate.value = rate;
+        }
+      });
+    } catch (e) {
+      console.warn('更新音调失败:', e);
+    }
+  }, [voicePitch]);
 
   const pauseAudio = useCallback(() => {
     stopPlayback();
@@ -708,8 +828,8 @@ export const useAudioManager = () => {
           console.error(`加载语音文件失败: ${file.name}`, error);
         }
       }
-      // 2. 合成总时长 = 语音总时长 + 15s
-      const totalDuration = voiceTotalDuration + 15;
+      // 2. 合成总时长改为语音总时长，音乐循环陪衬语音
+      const totalDuration = voiceTotalDuration;
       // 3. 加载背景音乐文件
       const musicBufferList: { buffer: AudioBuffer; gain: number }[] = [];
       for (const file of musicFiles) {
@@ -847,6 +967,7 @@ export const useAudioManager = () => {
     normalizeVolume,
     composeAudio,
     downloadComposedAudio,
+    reorderFiles,
     
     // 新增的URL管理和恢复功能
     validateBlobUrl,

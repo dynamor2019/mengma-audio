@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { Play, Pause, Square, RotateCcw, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,12 +11,15 @@ interface ComposedAudioPlayerProps {
   composedAudioUrl: string | null;
   onDownload: (formats: AudioFormat[]) => void;
   isComposing: boolean;
+  // 当点击播放并开始播放合成音频时触发，用于停止其他预览播放
+  onStartPlay?: () => void;
 }
 
-export const ComposedAudioPlayer = ({
+const ComposedAudioPlayerComponent = ({
   composedAudioUrl,
   onDownload,
-  isComposing
+  isComposing,
+  onStartPlay
 }: ComposedAudioPlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -55,6 +58,8 @@ export const ComposedAudioPlayer = ({
     if (isPlaying) {
       audioRef.current.pause();
     } else {
+      // 开始播放时先通知外部停止预览播放
+      try { onStartPlay?.(); } catch {}
       audioRef.current.play();
     }
     setIsPlaying(!isPlaying);
@@ -84,13 +89,11 @@ export const ComposedAudioPlayer = ({
 
   if (!composedAudioUrl && !isComposing) {
     return (
-      <Card className="bg-gradient-secondary border-border p-8">
+      <Card className="bg-gradient-secondary border-border p-4">
         <div className="text-center text-muted-foreground">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
-            <Play className="w-8 h-8" />
+          <div className="w-12 h-12 mx-auto rounded-full bg-muted/50 flex items-center justify-center">
+            <Play className="w-6 h-6" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">合成音频播放器</h3>
-          <p>请先上传音频文件并点击合成按钮</p>
         </div>
       </Card>
     );
@@ -102,24 +105,14 @@ export const ComposedAudioPlayer = ({
         <audio ref={audioRef} src={composedAudioUrl} preload="metadata" />
       )}
       
-      <div className="p-6">
-        <div className="flex items-center gap-2 mb-6">
-          <Badge variant="secondary" className="bg-accent/20 text-accent">
-            合成音频
-          </Badge>
-          {isComposing && (
-            <Badge variant="secondary" className="bg-primary/20 text-primary animate-pulse">
-              合成中..
-            </Badge>
-          )}
-        </div>
+      <div className="p-3">
 
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-3 mb-3">
           <Button
             onClick={handlePlayPause}
             disabled={!composedAudioUrl || isComposing}
             className={cn(
-              "h-12 w-12",
+              "h-10 w-10",
               composedAudioUrl && !isComposing
                 ? "bg-gradient-primary hover:bg-gradient-primary/90 text-primary-foreground shadow-glow"
                 : "bg-muted text-muted-foreground"
@@ -152,14 +145,14 @@ export const ComposedAudioPlayer = ({
 
           <div className="flex-1" />
 
-          <div className="flex items-center gap-2 min-w-[120px]">
+          <div className="flex items-center gap-2 min-w-[110px]">
             <Volume2 className="w-4 h-4 text-muted-foreground" />
             <Slider
               value={[volume]}
               onValueChange={(value) => setVolume(value[0])}
               max={100}
               step={1}
-              className="w-16"
+              className="w-14"
             />
             <span className="text-sm text-muted-foreground w-8">
               {volume}%
@@ -168,7 +161,7 @@ export const ComposedAudioPlayer = ({
         </div>
         
         {/* Progress bar */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           <Slider
             value={[currentTime]}
             onValueChange={(value) => handleSeek(value[0])}
@@ -185,7 +178,7 @@ export const ComposedAudioPlayer = ({
 
         {/* Waveform visualization */}
         {composedAudioUrl && (
-          <div className="mt-4 flex items-end gap-px h-12 bg-muted/20 rounded-lg p-2">
+          <div className="mt-2 flex items-end gap-px h-6 bg-muted/20 rounded-md p-1">
             {Array.from({ length: 50 }).map((_, i) => (
               <div
                 key={i}
@@ -206,7 +199,7 @@ export const ComposedAudioPlayer = ({
 
         {/* Export Format Selector */}
         {composedAudioUrl && (
-          <div className="mt-6">
+          <div className="mt-3">
             <ExportFormatSelector
               onExport={onDownload}
               disabled={isComposing}
@@ -218,3 +211,5 @@ export const ComposedAudioPlayer = ({
     </Card>
   );
 };
+
+export const ComposedAudioPlayer = memo(ComposedAudioPlayerComponent);
