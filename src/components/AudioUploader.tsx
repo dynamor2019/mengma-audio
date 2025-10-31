@@ -9,7 +9,7 @@ interface AudioUploaderProps {
   multiple?: boolean;
 }
 
-const AudioUploaderComponent = ({ onFilesUpload, accept = ".mp3,.wav,.m4a,.flac", multiple = true }: AudioUploaderProps) => {
+const AudioUploaderComponent = ({ onFilesUpload, accept = "audio/*", multiple = true }: AudioUploaderProps) => {
   const handleFileChange = useCallback((fileList: FileList | null, type: 'voice' | 'music') => {
     console.log('AudioUploader: handleFileChange triggered', { fileList, type });
     if (fileList) {
@@ -68,9 +68,9 @@ const AudioUploaderComponent = ({ onFilesUpload, accept = ".mp3,.wav,.m4a,.flac"
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-xs font-medium mb-0.5 text-foreground truncate">{title}</h3>
-          <p className="text-[11px] text-muted-foreground mb-0.5 truncate">{description}</p>
+          <p className="text-[11px] text-muted-foreground mb-0.5 truncate">{description}（支持多选）</p>
           <div className="text-[11px] text-muted-foreground opacity-75">
-            MP3, WAV, M4A, FLAC
+            支持所有音频类型（audio/*）
           </div>
         </div>
       </div>

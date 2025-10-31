@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, memo } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Mic, Square } from 'lucide-react';
 
@@ -22,9 +23,21 @@ const VoiceCaptureControlsComponent = ({ onAddVoiceFiles }: VoiceCaptureControls
     };
   }, []);
 
+  const getUserMediaCompat = async (constraints: MediaStreamConstraints) => {
+    const md = navigator.mediaDevices as MediaDevices | undefined;
+    if (md && md.getUserMedia) {
+      return md.getUserMedia(constraints);
+    }
+    const legacy = (navigator as any).webkitGetUserMedia || (navigator as any).mozGetUserMedia || (navigator as any).getUserMedia;
+    if (legacy) {
+      return new Promise<MediaStream>((resolve, reject) => legacy.call(navigator, constraints, resolve, reject));
+    }
+    throw new Error('当前环境不支持麦克风访问（缺少 mediaDevices）');
+  };
+
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await getUserMediaCompat({ audio: true });
       mediaStreamRef.current = stream;
       const recorder = new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
@@ -47,9 +60,18 @@ const VoiceCaptureControlsComponent = ({ onAddVoiceFiles }: VoiceCaptureControls
       };
       recorder.start();
       setIsRecording(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('开始录音失败:', error);
-      alert('无法访问麦克风，请检查权限设置');
+      const name = error?.name || '';
+      const msg = error?.message || '';
+      // 统一友好提示，并给出操作指引
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        toast.error('无法访问麦克风：请在系统设置中授予麦克风权限');
+      } else if (msg.includes('mediaDevices')) {
+        toast.error('当前系统WebView不支持麦克风访问（缺少 mediaDevices）');
+      } else {
+        toast.error(`无法访问麦克风：${msg || '未知错误'}`);
+      }
     }
   };
 

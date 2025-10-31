@@ -814,8 +814,10 @@ export const useAudioManager = () => {
       const voiceBufferList: { buffer: AudioBuffer; gain: number; duration: number }[] = [];
       for (const file of voiceFiles) {
         try {
-          const response = await fetch(file.url);
-          const arrayBuffer = await response.arrayBuffer();
+          // Android WebView/Capacitor 上对 blob:URL 的 fetch 可能失败，优先使用原始 File 对象读取
+          const arrayBuffer = file.file
+            ? await file.file.arrayBuffer()
+            : await (await fetch(file.url)).arrayBuffer();
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
           const individualGain = voiceFileGains[file.id] || 100;
           voiceBufferList.push({
@@ -828,14 +830,26 @@ export const useAudioManager = () => {
           console.error(`加载语音文件失败: ${file.name}`, error);
         }
       }
+      // Android 环境下如果没有语音文件而只有音乐，总时长为0会导致离线渲染报错，这里直接提示并中止
+      if (voiceBufferList.length === 0) {
+        toast.error('合成需要至少一个语音文件（仅有音乐会导致失败）');
+        setIsComposing(false);
+        return;
+      }
       // 2. 合成总时长改为语音总时长，音乐循环陪衬语音
       const totalDuration = voiceTotalDuration;
+      if (!totalDuration || totalDuration <= 0) {
+        toast.error('合成时长为0，请检查语音文件是否有效');
+        setIsComposing(false);
+        return;
+      }
       // 3. 加载背景音乐文件
       const musicBufferList: { buffer: AudioBuffer; gain: number }[] = [];
       for (const file of musicFiles) {
         try {
-          const response = await fetch(file.url);
-          const arrayBuffer = await response.arrayBuffer();
+          const arrayBuffer = file.file
+            ? await file.file.arrayBuffer()
+            : await (await fetch(file.url)).arrayBuffer();
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
           musicBufferList.push({
             buffer: audioBuffer,
@@ -850,6 +864,11 @@ export const useAudioManager = () => {
         return;
       }
       // 4. 创建离线音频上下文，时长为 totalDuration
+      if (typeof OfflineAudioContext === 'undefined') {
+        toast.error('当前环境不支持离线合成（OfflineAudioContext）。请更新系统WebView或使用浏览器');
+        setIsComposing(false);
+        return;
+      }
       const sampleRate = audioContext.sampleRate;
       const length = Math.ceil(totalDuration * sampleRate);
       const offlineContext = new OfflineAudioContext(2, length, sampleRate);
@@ -888,7 +907,15 @@ export const useAudioManager = () => {
         }
       }
       // 7. 渲染音频
-      const renderedBuffer = await offlineContext.startRendering();
+      let renderedBuffer: AudioBuffer;
+      try {
+        renderedBuffer = await offlineContext.startRendering();
+      } catch (renderErr: any) {
+        console.error('离线渲染失败:', renderErr);
+        toast.error(`音频合成失败（渲染错误）：${renderErr?.message || '未知原因'}`);
+        setIsComposing(false);
+        return;
+      }
       
       // 转换为WAV格式
       const wavBuffer = audioBufferToWav(renderedBuffer);
@@ -906,9 +933,11 @@ export const useAudioManager = () => {
       
       toast.success('音频合成完成！');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('音频合成失败:', error);
-      toast.error('音频合成失败');
+      // 提供更明确的错误提示，便于 Android 环境定位问题
+      const msg = typeof error?.message === 'string' ? error.message : '未知原因';
+      toast.error(`音频合成失败：${msg}`);
     } finally {
       setIsComposing(false);
     }

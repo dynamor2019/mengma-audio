@@ -238,7 +238,7 @@ const AudioTrackComponent = ({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".mp3,.wav,.m4a,.flac,.ogg,.aac,.webm"
+                  accept="audio/*"
                   multiple
                   className="hidden"
                   onChange={(e) => {
