@@ -35,11 +35,36 @@ const VoiceCaptureControlsComponent = ({ onAddVoiceFiles }: VoiceCaptureControls
     throw new Error('当前环境不支持麦克风访问（缺少 mediaDevices）');
   };
 
+  const selectSupportedMimeType = (): string | undefined => {
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/ogg;codecs=opus',
+    ];
+    for (const type of candidates) {
+      if ((window as any).MediaRecorder?.isTypeSupported?.(type)) {
+        return type;
+      }
+    }
+    return undefined;
+  };
+
   const startRecording = async () => {
     try {
       const stream = await getUserMediaCompat({ audio: true });
+      // 检查设备是否存在音频输入设备，提前给出指引（模拟器或设备禁用麦克风时）
+      try {
+        const devices = await navigator.mediaDevices?.enumerateDevices?.();
+        const hasAudioInput = Array.isArray(devices) && devices.some(d => d.kind === 'audioinput');
+        if (!hasAudioInput) {
+          toast.warning('未检测到音频输入设备：请检查模拟器/设备麦克风是否可用');
+        }
+      } catch { /* 枚举失败忽略 */ }
+
       mediaStreamRef.current = stream;
-      const recorder = new MediaRecorder(stream);
+      const mimeType = selectSupportedMimeType();
+      const options = mimeType ? { mimeType } : undefined;
+      const recorder = new MediaRecorder(stream, options as any);
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
@@ -67,6 +92,12 @@ const VoiceCaptureControlsComponent = ({ onAddVoiceFiles }: VoiceCaptureControls
       // 统一友好提示，并给出操作指引
       if (name === 'NotAllowedError' || name === 'SecurityError') {
         toast.error('无法访问麦克风：请在系统设置中授予麦克风权限');
+      } else if (name === 'NotFoundError') {
+        toast.error('未找到音频输入设备：请连接或启用麦克风');
+      } else if (name === 'NotReadableError') {
+        toast.error('麦克风忙或不可读：请关闭其它录音应用后重试');
+      } else if (name === 'OverconstrainedError') {
+        toast.error('当前录音参数不受支持：请使用默认音频约束');
       } else if (msg.includes('mediaDevices')) {
         toast.error('当前系统WebView不支持麦克风访问（缺少 mediaDevices）');
       } else {

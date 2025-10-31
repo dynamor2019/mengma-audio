@@ -12,10 +12,10 @@ const applyTheme = (theme: Theme) => {
 }
 
 export const ThemeToggle = () => {
-  const [theme, setTheme] = useState<Theme>('dark')
+  const [theme, setTheme] = useState<Theme>('light')
 
   useEffect(() => {
-    const stored = (localStorage.getItem('theme') as Theme) || 'dark'
+    const stored = (localStorage.getItem('theme') as Theme) || 'light'
     setTheme(stored)
     applyTheme(stored)
   }, [])

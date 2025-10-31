@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">猛犸</string>
-    <string name="title_activity_main">猛犸</string>
+    <string name="app_name">mengma-1.0</string>
+    <string name="title_activity_main">mengma-1.0</string>
     <string name="package_name">com.mengma.audiocomposer</string>
     <string name="custom_url_scheme">com.mengma.audiocomposer</string>
 </resources>

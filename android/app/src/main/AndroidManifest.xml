@@ -40,4 +40,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 麦克风权限：用于 getUserMedia 录音 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- 调整音频设置权限：Chromium 媒体栈要求，与 RECORD_AUDIO 搭配 -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- 麦克风特性声明：不强制要求，提升兼容性与商店识别 -->
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 </manifest>
