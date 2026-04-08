@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, memo } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Mic, Square } from 'lucide-react';
@@ -49,6 +51,37 @@ const VoiceCaptureControlsComponent = ({ onAddVoiceFiles }: VoiceCaptureControls
     return undefined;
   };
 
+  const sanitizeFilename = (rawName: string) => {
+    const trimmed = rawName.trim();
+    const withoutExt = trimmed.replace(/\.webm$/i, '');
+    const safe = withoutExt.replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim();
+    const base = safe || `recording-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+    return `${base}.webm`;
+  };
+
+  const getFilenameFromUser = () => {
+    const suggested = `recording-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+    const userInput = window.prompt('录音已结束，请修改或确认文件名：', suggested);
+    return sanitizeFilename(userInput ?? suggested);
+  };
+
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = typeof reader.result === 'string' ? reader.result : '';
+        const base64 = result.split(',')[1];
+        if (!base64) {
+          reject(new Error('无法转换录音数据'));
+          return;
+        }
+        resolve(base64);
+      };
+      reader.onerror = () => reject(reader.error ?? new Error('读取录音数据失败'));
+      reader.readAsDataURL(blob);
+    });
+  };
+
   const startRecording = async () => {
     try {
       const stream = await getUserMediaCompat({ audio: true });
@@ -74,7 +107,7 @@ const VoiceCaptureControlsComponent = ({ onAddVoiceFiles }: VoiceCaptureControls
       };
       recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        const filename = `recording-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+        const filename = getFilenameFromUser();
         await saveRecording(blob, filename);
         const file = new File([blob], filename, { type: blob.type });
         onAddVoiceFiles([file]);
@@ -118,6 +151,22 @@ const VoiceCaptureControlsComponent = ({ onAddVoiceFiles }: VoiceCaptureControls
   // 已移除本地文件选择入口，统一使用轨道头部的“本地上传”按钮
 
   const saveRecording = async (blob: Blob, filename: string) => {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const base64Data = await blobToBase64(blob);
+        await Filesystem.writeFile({
+          path: `Recordings/${filename}`,
+          data: base64Data,
+          directory: Directory.Documents,
+          recursive: true,
+        });
+        toast.success('录音已保存到手机本地');
+        return true;
+      }
+    } catch (error) {
+      console.warn('保存到手机本地失败，将回退到浏览器保存方式', error);
+    }
+
     try {
       // 优先使用文件系统访问API保存到用户选择的本地目录
       if ('showDirectoryPicker' in window) {
