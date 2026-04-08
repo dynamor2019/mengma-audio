@@ -70,6 +70,7 @@ const AudioTrackComponent = ({
   const [marqueeFlags, setMarqueeFlags] = useState<Record<string, boolean>>({});
   // 响度指标所需的音频数据缓冲
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | undefined>(undefined);
+  const voiceStorageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const computeFlags = () => {
@@ -221,6 +222,11 @@ const AudioTrackComponent = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const jumpToVoiceStorage = () => {
+    if (type !== 'voice') return;
+    voiceStorageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <Card className="bg-gradient-secondary border-border overflow-hidden">
       <div className="p-4 border-b border-border">
@@ -231,7 +237,10 @@ const AudioTrackComponent = ({
               {type === 'voice' ? '语音轨道' : '背景音乐'}
             </h3>
             {type === 'voice' && onAddVoiceFiles && (
-              <VoiceCaptureControls onAddVoiceFiles={onAddVoiceFiles} />
+              <VoiceCaptureControls
+                onAddVoiceFiles={onAddVoiceFiles}
+                onSavedToVoiceStorage={jumpToVoiceStorage}
+              />
             )}
             {onAddFiles && (
               <>
@@ -296,7 +305,7 @@ const AudioTrackComponent = ({
                 )}
               </Button>
               <div className="flex items-center gap-2 sm:gap-3">
-                {isPlaying && files.length > 0 && (
+                {files.length > 0 && (
                   <LoudnessIndicator
                     audioData={audioBuffer}
                     isPlaying={isPlaying}
@@ -320,7 +329,7 @@ const AudioTrackComponent = ({
       <div className={cn(
         files.length === 0 ? "min-h-[110px] p-2 flex items-center justify-center" : "min-h-[100px] p-2",
         `bg-${trackBgColor}`
-      )}>
+      )} ref={type === 'voice' ? voiceStorageRef : undefined}>
         {files.length === 0 ? (
           <div className="text-muted-foreground text-sm">
             {type === 'voice' ? '语音存放空间' : '背景音乐存放空间'}

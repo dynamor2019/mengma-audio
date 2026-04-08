@@ -17,7 +17,7 @@ const AudioUploaderComponent = ({ onFilesUpload, accept = "audio/*", multiple = 
       console.log('AudioUploader: 选择的文件:', files.map(f => ({ name: f.name, type: f.type, size: f.size })));
       const audioFiles = files.filter(file => {
         const isAudio = file.type.startsWith('audio/') || 
-                       /\.(mp3|wav|m4a|flac|aac|ogg)$/i.test(file.name);
+                       /\.(mp3|wav|m4a|flac|aac|ogg|webm|mp4)$/i.test(file.name);
         console.log(`AudioUploader: 文件 ${file.name} 是否为音频:`, isAudio);
         return isAudio;
       });

@@ -56,7 +56,7 @@ const Index = () => {
             onRemoveFile={(id) => removeFile(id, 'voice')}
             onReorderFiles={(start, end) => reorderFiles(start, end, 'voice')}
             isPlaying={isPlaying}
-            onPlayPause={playAudio}
+            onPlayPause={isPlaying ? pauseAudio : playAudio}
             volume={voiceVolume}
             onVolumeChange={setVoiceVolume}
             isMuted={voiceMuted}
@@ -77,7 +77,7 @@ const Index = () => {
             onRemoveFile={(id) => removeFile(id, 'music')}
             onReorderFiles={(start, end) => reorderFiles(start, end, 'music')}
             isPlaying={isPlaying}
-            onPlayPause={playAudio}
+            onPlayPause={isPlaying ? pauseAudio : playAudio}
             volume={musicVolume}
             onVolumeChange={setMusicVolume}
             isMuted={musicMuted}

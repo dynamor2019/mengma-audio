@@ -27,24 +27,27 @@ export const LoudnessIndicator = ({
       return;
     }
     
-    // Simulate real-time loudness calculation
+    let smoothedLoudness = 0;
+    // Calculate a stable loudness meter from audio buffer
     const interval = setInterval(() => {
-      // Calculate RMS loudness from audio data
       const samples = audioData.getChannelData(0);
       let sum = 0;
       let peak = 0;
-      
-      for (let i = 0; i < samples.length; i += 1000) { // Sample every 1000th point for performance
+      let count = 0;
+
+      for (let i = 0; i < samples.length; i += 1024) {
         const sample = Math.abs(samples[i]);
         sum += sample * sample;
         peak = Math.max(peak, sample);
+        count++;
       }
-      
-      const rms = Math.sqrt(sum / (samples.length / 1000));
-      const loudnessDb = 20 * Math.log10(rms + 0.001); // Add small value to avoid log(0)
-      const normalizedLoudness = Math.max(0, Math.min(100, (loudnessDb + 60) * (100/60))); // Normalize -60dB to 0dB range
 
-      setLoudness(normalizedLoudness + Math.random() * 10); // Add some variation for animation
+      const rms = Math.sqrt(sum / Math.max(1, count));
+      const loudnessDb = 20 * Math.log10(Math.max(rms, 1e-6));
+      const normalizedLoudness = Math.max(0, Math.min(100, ((loudnessDb + 60) / 60) * 100));
+      smoothedLoudness = smoothedLoudness * 0.8 + normalizedLoudness * 0.2;
+
+      setLoudness(smoothedLoudness);
       setPeakLevel(peak * 100);
       setRmsDb(loudnessDb);
     }, 50);
@@ -74,8 +77,8 @@ export const LoudnessIndicator = ({
             className={cn(
               "h-full transition-all duration-100 rounded",
               `bg-${trackColor}`,
-              loudness > 80 && "bg-red-500", // Peak warning
-              loudness > 90 && "animate-pulse" // Critical level
+              (rmsDb > -12 || peakLevel > 95) && "bg-red-500",
+              (rmsDb > -6 || peakLevel > 98) && "animate-pulse"
             )}
             style={{ width: `${Math.max(0, Math.min(100, loudness))}%` }}
           />
@@ -101,7 +104,7 @@ export const LoudnessIndicator = ({
           RMS: {isPlaying ? `${rmsDb.toFixed(1)} dB` : '--'}
         </span>
         <span className={cn(
-          peakLevel > 90 && "text-red-400 font-bold animate-pulse"
+          (rmsDb > -12 || peakLevel > 95) && "text-red-400 font-bold animate-pulse"
         )}>
           Peak: {isPlaying ? `${Math.round(peakLevel)}%` : '--'}
         </span>

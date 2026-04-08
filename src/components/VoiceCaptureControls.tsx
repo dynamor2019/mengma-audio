@@ -7,9 +7,10 @@ import { Mic, Square } from 'lucide-react';
 
 interface VoiceCaptureControlsProps {
   onAddVoiceFiles: (files: File[]) => void;
+  onSavedToVoiceStorage?: () => void;
 }
 
-const VoiceCaptureControlsComponent = ({ onAddVoiceFiles }: VoiceCaptureControlsProps) => {
+const VoiceCaptureControlsComponent = ({ onAddVoiceFiles, onSavedToVoiceStorage }: VoiceCaptureControlsProps) => {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
@@ -39,6 +40,8 @@ const VoiceCaptureControlsComponent = ({ onAddVoiceFiles }: VoiceCaptureControls
 
   const selectSupportedMimeType = (): string | undefined => {
     const candidates = [
+      'audio/mp4',
+      'audio/aac',
       'audio/webm;codecs=opus',
       'audio/webm',
       'audio/ogg;codecs=opus',
@@ -51,18 +54,27 @@ const VoiceCaptureControlsComponent = ({ onAddVoiceFiles }: VoiceCaptureControls
     return undefined;
   };
 
-  const sanitizeFilename = (rawName: string) => {
-    const trimmed = rawName.trim();
-    const withoutExt = trimmed.replace(/\.webm$/i, '');
-    const safe = withoutExt.replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim();
-    const base = safe || `recording-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-    return `${base}.webm`;
+  const getFileExtension = (mimeType?: string) => {
+    if (!mimeType) return 'webm';
+    if (mimeType.includes('mp4')) return 'mp4';
+    if (mimeType.includes('aac')) return 'aac';
+    if (mimeType.includes('ogg')) return 'ogg';
+    if (mimeType.includes('webm')) return 'webm';
+    return 'webm';
   };
 
-  const getFilenameFromUser = () => {
-    const suggested = `recording-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+  const sanitizeFilename = (rawName: string, extension: string) => {
+    const trimmed = rawName.trim();
+    const withoutExt = trimmed.replace(/\.[^.]+$/i, '');
+    const safe = withoutExt.replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim();
+    const base = safe || `recording-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+    return `${base}.${extension}`;
+  };
+
+  const getFilenameFromUser = (extension: string) => {
+    const suggested = `recording-${new Date().toISOString().replace(/[:.]/g, '-')}.${extension}`;
     const userInput = window.prompt('录音已结束，请修改或确认文件名：', suggested);
-    return sanitizeFilename(userInput ?? suggested);
+    return sanitizeFilename(userInput ?? suggested, extension);
   };
 
   const blobToBase64 = (blob: Blob): Promise<string> => {
@@ -84,7 +96,14 @@ const VoiceCaptureControlsComponent = ({ onAddVoiceFiles }: VoiceCaptureControls
 
   const startRecording = async () => {
     try {
-      const stream = await getUserMediaCompat({ audio: true });
+      const stream = await getUserMediaCompat({
+        audio: {
+          noiseSuppression: true,
+          echoCancellation: true,
+          autoGainControl: false,
+          channelCount: 1,
+        } as MediaTrackConstraints
+      });
       // 检查设备是否存在音频输入设备，提前给出指引（模拟器或设备禁用麦克风时）
       try {
         const devices = await navigator.mediaDevices?.enumerateDevices?.();
@@ -98,6 +117,10 @@ const VoiceCaptureControlsComponent = ({ onAddVoiceFiles }: VoiceCaptureControls
       const mimeType = selectSupportedMimeType();
       const options = mimeType ? { mimeType } : undefined;
       const recorder = new MediaRecorder(stream, options as any);
+      const recordedMimeType = mimeType || recorder.mimeType || 'audio/webm';
+      if (!recordedMimeType.includes('mp4')) {
+        toast.warning('当前设备不支持 MP4 录音，已自动回退为其它音频格式');
+      }
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
@@ -106,11 +129,13 @@ const VoiceCaptureControlsComponent = ({ onAddVoiceFiles }: VoiceCaptureControls
         }
       };
       recorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        const filename = getFilenameFromUser();
+        const extension = getFileExtension(recordedMimeType);
+        const blob = new Blob(chunksRef.current, { type: recordedMimeType });
+        const filename = getFilenameFromUser(extension);
         await saveRecording(blob, filename);
         const file = new File([blob], filename, { type: blob.type });
         onAddVoiceFiles([file]);
+        onSavedToVoiceStorage?.();
         chunksRef.current = [];
         // 释放媒体流
         mediaStreamRef.current?.getTracks().forEach(t => t.stop());

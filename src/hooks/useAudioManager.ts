@@ -26,12 +26,33 @@ export const useAudioManager = () => {
   const voiceSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const musicSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const startTimeRef = useRef<number>(0);
+  const pausedTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number>();
   const activeUrlsRef = useRef<Set<string>>(new Set()); // 跟踪所有活跃的blob URL
   const urlRefCountRef = useRef<Map<string, number>>(new Map()); // URL引用计数
   // 每轨道主增益节点引用，支持播放中实时调节音量/增益/静音
   const voiceMasterGainRef = useRef<GainNode | null>(null);
   const musicMasterGainRef = useRef<GainNode | null>(null);
+
+  const createVoiceDynamicsChain = useCallback((context: BaseAudioContext, destination: AudioNode) => {
+    const compressor = context.createDynamicsCompressor();
+    compressor.threshold.value = -24;
+    compressor.knee.value = 20;
+    compressor.ratio.value = 4;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.2;
+
+    const limiter = context.createDynamicsCompressor();
+    limiter.threshold.value = -3;
+    limiter.knee.value = 0;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.001;
+    limiter.release.value = 0.08;
+
+    compressor.connect(limiter);
+    limiter.connect(destination);
+    return compressor;
+  }, []);
 
   // 调试函数：记录当前活跃的URL
   const logActiveUrls = useCallback(() => {
@@ -545,7 +566,13 @@ export const useAudioManager = () => {
     toast.success('已清空所有文件');
   }, [voiceFiles, musicFiles, removeUrlRef]);
 
-  const stopPlayback = useCallback(() => {
+  const stopPlayback = useCallback((resetPosition: boolean = true) => {
+    const audioContext = audioContextRef.current;
+    let pausedTime = pausedTimeRef.current;
+    if (audioContext && startTimeRef.current > 0) {
+      pausedTime = Math.max(0, audioContext.currentTime - startTimeRef.current);
+    }
+
     // 停止所有音频源
     voiceSourcesRef.current.forEach(source => {
       try {
@@ -581,20 +608,24 @@ export const useAudioManager = () => {
     }
     
     setIsPlaying(false);
-    setCurrentTime(0);
+    if (resetPosition) {
+      pausedTimeRef.current = 0;
+      setCurrentTime(0);
+    } else {
+      pausedTimeRef.current = pausedTime;
+      setCurrentTime(pausedTime);
+    }
     startTimeRef.current = 0;
   }, []);
 
   const playAudio = useCallback(async () => {
     try {
       const audioContext = await initAudioContext();
-      stopPlayback();
+      stopPlayback(false);
       if (voiceFiles.length === 0 && musicFiles.length === 0) {
         toast.error('请先添加音频文件');
         return;
       }
-      // 设置播放起始时间用于进度更新
-      startTimeRef.current = audioContext.currentTime;
       // 1. 语音轨道顺序拼接
       let voiceDuration = 0;
       const voiceBufferList: { buffer: AudioBuffer; gain: number; duration: number }[] = [];
@@ -617,6 +648,10 @@ export const useAudioManager = () => {
       }
       // 2. 合成总时长改为语音总时长，音乐循环陪衬语音
       const totalDuration = voiceDuration;
+      const playbackOffset = Math.max(0, Math.min(pausedTimeRef.current, totalDuration));
+      // 设置播放起始时间用于进度更新（支持暂停后继续）
+      startTimeRef.current = audioContext.currentTime - playbackOffset;
+      setCurrentTime(playbackOffset);
       // 3. 背景音乐循环
       const musicBufferList: { buffer: AudioBuffer; gain: number }[] = [];
       for (const file of musicFiles) {
@@ -640,7 +675,8 @@ export const useAudioManager = () => {
       // 创建并配置每轨道主增益节点（用于实时联动）
       const voiceMasterGain = audioContext.createGain();
       voiceMasterGain.gain.value = (voiceVolume / 100) * (voiceGain / 100) * (voiceMuted ? 0 : 1);
-      voiceMasterGain.connect(audioContext.destination);
+      const voiceDynamicsInput = createVoiceDynamicsChain(audioContext, audioContext.destination);
+      voiceMasterGain.connect(voiceDynamicsInput);
       voiceMasterGainRef.current = voiceMasterGain;
 
       const musicMasterGain = audioContext.createGain();
@@ -650,6 +686,10 @@ export const useAudioManager = () => {
       // 4. 播放语音轨道（顺序拼接）
       let offset = 0;
       voiceBufferList.forEach(({ buffer, gain, duration }) => {
+        if (offset + duration <= playbackOffset) {
+          offset += duration;
+          return;
+        }
         const source = audioContext.createBufferSource();
         const gainNode = audioContext.createGain();
         source.buffer = buffer;
@@ -661,7 +701,9 @@ export const useAudioManager = () => {
         source.connect(gainNode);
         // 接入语音主增益节点
         gainNode.connect(voiceMasterGainRef.current!);
-        source.start(audioContext.currentTime + offset);
+        const sourceOffset = Math.max(0, playbackOffset - offset);
+        const playAt = audioContext.currentTime + Math.max(0, offset - playbackOffset);
+        source.start(playAt, sourceOffset);
         voiceSourcesRef.current.push(source);
         offset += duration;
       });
@@ -678,11 +720,15 @@ export const useAudioManager = () => {
             // 接入音乐主增益节点
             gainNode.connect(musicMasterGainRef.current!);
             const playDuration = Math.min(buffer.duration, totalDuration - musicOffset);
-            source.start(audioContext.currentTime + musicOffset);
-            // 如果最后一段不足一首，提前 stop
-            if (playDuration < buffer.duration) {
-              source.stop(audioContext.currentTime + musicOffset + playDuration);
+            if (musicOffset + playDuration <= playbackOffset) {
+              musicOffset += playDuration;
+              continue;
             }
+            const sourceOffset = Math.max(0, playbackOffset - musicOffset);
+            const playAt = audioContext.currentTime + Math.max(0, musicOffset - playbackOffset);
+            const remaining = Math.max(0, playDuration - sourceOffset);
+            source.start(playAt, sourceOffset);
+            source.stop(playAt + remaining);
             musicSourcesRef.current.push(source);
             musicOffset += playDuration;
             if (musicOffset >= totalDuration) break;
@@ -692,14 +738,15 @@ export const useAudioManager = () => {
       setIsPlaying(true);
       // 更新播放时间
       const updateTime = () => {
-        if (audioContext && startTimeRef.current) {
-          const elapsed = audioContext.currentTime - startTimeRef.current;
-          setCurrentTime(elapsed);
-          
-          if (isPlaying) {
-            animationFrameRef.current = requestAnimationFrame(updateTime);
-          }
+        if (!audioContext || !startTimeRef.current) return;
+        const elapsed = Math.max(0, audioContext.currentTime - startTimeRef.current);
+        const clamped = Math.min(elapsed, totalDuration);
+        setCurrentTime(clamped);
+        if (elapsed >= totalDuration) {
+          stopPlayback(true);
+          return;
         }
+        animationFrameRef.current = requestAnimationFrame(updateTime);
       };
       
       updateTime();
@@ -708,7 +755,7 @@ export const useAudioManager = () => {
       console.error('播放失败:', error);
       toast.error('播放失败');
     }
-  }, [voiceFiles, musicFiles, voiceVolume, musicVolume, voiceGain, musicGain, voiceMuted, musicMuted, voiceFileGains, isPlaying, initAudioContext, stopPlayback]);
+  }, [voiceFiles, musicFiles, voiceVolume, musicVolume, voiceGain, musicGain, voiceMuted, musicMuted, voiceFileGains, initAudioContext, stopPlayback, createVoiceDynamicsChain]);
 
   // 播放中实时联动：更新主增益节点的值
   useEffect(() => {
@@ -743,7 +790,7 @@ export const useAudioManager = () => {
   }, [voicePitch]);
 
   const pauseAudio = useCallback(() => {
-    stopPlayback();
+    stopPlayback(false);
     toast.info('已暂停播放');
   }, [stopPlayback]);
 
@@ -872,6 +919,7 @@ export const useAudioManager = () => {
       const sampleRate = audioContext.sampleRate;
       const length = Math.ceil(totalDuration * sampleRate);
       const offlineContext = new OfflineAudioContext(2, length, sampleRate);
+      const voiceDynamicsInput = createVoiceDynamicsChain(offlineContext, offlineContext.destination);
       // 5. 顺序拼接语音轨道
       let offset = 0;
       for (const { buffer, gain, duration } of voiceBufferList) {
@@ -880,7 +928,7 @@ export const useAudioManager = () => {
         source.buffer = buffer;
         gainNode.gain.value = gain;
         source.connect(gainNode);
-        gainNode.connect(offlineContext.destination);
+        gainNode.connect(voiceDynamicsInput);
         source.start(offset);
         offset += duration;
       }
@@ -941,7 +989,7 @@ export const useAudioManager = () => {
     } finally {
       setIsComposing(false);
     }
-  }, [voiceFiles, musicFiles, voiceVolume, musicVolume, voiceGain, musicGain, voiceMuted, musicMuted, voiceFileGains, composedAudioUrl, initAudioContext, addUrlRef, removeUrlRef]);
+  }, [voiceFiles, musicFiles, voiceVolume, musicVolume, voiceGain, musicGain, voiceMuted, musicMuted, voiceFileGains, composedAudioUrl, initAudioContext, addUrlRef, removeUrlRef, createVoiceDynamicsChain]);
 
   const downloadComposedAudio = useCallback(() => {
     if (!composedAudioUrl) {
